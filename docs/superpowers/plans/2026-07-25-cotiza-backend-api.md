@@ -6,7 +6,7 @@
 
 **Architecture:** Layered Express modules (`routes.js` → `controller.js` → `service.js`) per resource under `server/src/modules/`, backed by a single Prisma client wrapped in a tenant-scoping extension so `empresaId` is enforced server-side on every query, never trusted from the client. Money math uses cents-based rounding to avoid float errors; Prisma stores amounts as `Decimal`.
 
-**Tech Stack:** Node.js (JavaScript, no TypeScript), Express, Prisma + PostgreSQL (Neon in prod, Docker Compose locally), `jsonwebtoken`, `bcryptjs`, `zod`, `@react-pdf/renderer`, Vitest + Supertest.
+**Tech Stack:** Node.js (JavaScript, no TypeScript), Express, Prisma + PostgreSQL (Neon in prod, native local PostgreSQL via pgAdmin 4 in dev — no Docker on this machine), `jsonwebtoken`, `bcryptjs`, `zod`, `@react-pdf/renderer`, Vitest + Supertest.
 
 **Spec:** `docs/superpowers/specs/2026-07-25-cotiza-arquitectura-design.md` — read it before starting; every task below implements a specific section of it.
 
@@ -31,7 +31,6 @@
 
 ```
 server/
-├── docker-compose.yml
 ├── .env.example
 ├── .env                      # git-ignored
 ├── package.json
@@ -234,80 +233,51 @@ git commit -m "feat(server): scaffold Express app with health check"
 
 ---
 
-### Task 2: Docker Compose and environment configuration
+### Task 2: Local PostgreSQL environment configuration
+
+**No Docker on this machine.** PostgreSQL runs natively, installed and managed via pgAdmin 4 (mirrors the Pulso project's approach, adapted for a machine without Docker support). The `cotiza_dev` and `cotiza_test` databases are created manually by the user in pgAdmin — not by this task's steps.
 
 **Files:**
-- Create: `server/docker-compose.yml`
 - Create: `server/.env.example`
-- Create: `server/.env` (git-ignored, local only)
+- Create: `server/.env` (git-ignored, local only, placeholder password — the user fills in the real one)
 
 **Interfaces:**
 - Produces: `DATABASE_URL`, `TEST_DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PORT`, `FRONTEND_URL` env vars consumed by later tasks.
 
-- [ ] **Step 1: Create `server/docker-compose.yml`**
-
-```yaml
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: cotiza_postgres
-    environment:
-      POSTGRES_USER: cotiza
-      POSTGRES_PASSWORD: cotiza_dev_password
-      POSTGRES_DB: cotiza_dev
-    ports:
-      - "5432:5432"
-    volumes:
-      - cotiza_postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cotiza -d cotiza_dev"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  cotiza_postgres_data:
-```
-
-- [ ] **Step 2: Start the local database**
-
-Run: `cd server && docker compose up -d`
-Expected: `cotiza_postgres` container running and healthy (`docker compose ps` shows `healthy`).
-
-- [ ] **Step 3: Create `server/.env.example`**
+- [ ] **Step 1: Create `server/.env.example`**
 
 ```
-DATABASE_URL="postgresql://cotiza:cotiza_dev_password@localhost:5432/cotiza_dev"
-TEST_DATABASE_URL="postgresql://cotiza:cotiza_dev_password@localhost:5432/cotiza_test"
+DATABASE_URL="postgresql://postgres:TU_PASSWORD_AQUI@localhost:5432/cotiza_dev"
+TEST_DATABASE_URL="postgresql://postgres:TU_PASSWORD_AQUI@localhost:5432/cotiza_test"
 JWT_SECRET="replace-with-crypto-randomBytes-48-hex"
 JWT_EXPIRES_IN="7d"
 PORT=4000
 FRONTEND_URL="http://localhost:5173"
 ```
 
-- [ ] **Step 4: Generate a real secret and create `server/.env`**
+- [ ] **Step 2: Generate a real JWT secret and create `server/.env`**
 
 Run: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
 
-Copy `server/.env.example` to `server/.env` and paste the generated value into `JWT_SECRET`. Also create the test database:
+Copy `server/.env.example` to `server/.env`, paste the generated value into `JWT_SECRET`, and leave `TU_PASSWORD_AQUI` in both connection strings as a literal placeholder — the user replaces it manually with their local `postgres` superuser password before running any Prisma command against these databases.
 
-Run: `docker exec -it cotiza_postgres psql -U cotiza -d cotiza_dev -c "CREATE DATABASE cotiza_test;"`
-Expected: `CREATE DATABASE`.
+- [ ] **Step 3: Confirm the databases exist (user-provided, not created by this task)**
 
-- [ ] **Step 5: Verify `.env` is ignored**
+The user creates `cotiza_dev` and `cotiza_test` manually in pgAdmin 4 (e.g. via pgAdmin's Query Tool: `CREATE DATABASE cotiza_dev;` and `CREATE DATABASE cotiza_test;` run against the default `postgres` database, or through the GUI's "Create > Database..." dialog). This step is a checkpoint, not an action: do not attempt to create these databases programmatically, and do not attempt to run any command that depends on `server/.env`'s real password — it is a placeholder until the user edits it.
 
-Run: `cd server && git check-ignore -v .env` (once the repo is git-initialized in a later phase)
-Expected: matches `.gitignore`'s `.env` line. If git isn't initialized yet, skip this check and revisit it before the first commit that touches `server/`.
+- [ ] **Step 4: Verify `.env` is ignored**
 
-- [ ] **Step 6: Commit**
+Run: `cd server && git check-ignore -v .env`
+Expected: matches `.gitignore`'s `.env` line (set up in Task 1).
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add server/docker-compose.yml server/.env.example
-git commit -m "feat(server): add local Postgres via Docker Compose and env template"
+git add server/.env.example
+git commit -m "feat(server): add local PostgreSQL env template (no Docker)"
 ```
 
-(`.env` itself is never committed.)
+(`.env` itself is never committed — it currently holds a placeholder password the user will replace before Task 3's migration step.)
 
 ---
 
