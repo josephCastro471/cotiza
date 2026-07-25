@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cotizacionesRoutes from './modules/cotizaciones/routes.js';
 
 const app = express();
 
@@ -13,6 +14,8 @@ app.use(morgan('dev'));
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use('/api/cotizaciones', cotizacionesRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: { message: 'Recurso no encontrado.', code: 'NOT_FOUND' } });
