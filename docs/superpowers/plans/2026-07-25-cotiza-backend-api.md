@@ -23,6 +23,7 @@
 - API errors are `{ error: { message, code } }`; messages say what happened and what to do, no "Error:", no apologies (spec §8, referencing `design-system.md` §13).
 - `JWT_SECRET` is generated with `crypto.randomBytes(48).toString('hex')` and is never committed; `.env` is git-ignored, `.env.example` documents placeholders (spec §13).
 - Testing scope is deliberately minimal: totals calculation, state-machine transitions, and multi-tenant isolation — no broad unit-test sweep (spec §12).
+- Backend is ESM (`"type": "module"` in `server/package.json`), not CommonJS — vitest 2.x forbids `require('vitest')` from CommonJS. All relative imports use explicit `.js` extensions; package imports use `import`/`export` throughout (decided during Task 1 execution).
 
 ---
 
@@ -93,7 +94,7 @@ server/
 - Test: `server/src/app.test.js`
 
 **Interfaces:**
-- Produces: `module.exports = app` (Express instance) from `server/src/app.js`, importable by tests without starting a listener.
+- Produces: `export default app` (Express instance) from `server/src/app.js`, importable by tests without starting a listener.
 
 - [ ] **Step 1: Create `server/package.json`**
 
@@ -102,7 +103,7 @@ server/
   "name": "cotiza-server",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
@@ -152,9 +153,9 @@ dist/
 `server/src/app.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect } = require('vitest');
-const app = require('./app');
+import request from 'supertest';
+import { describe, it, expect } from 'vitest';
+import app from './app.js';
 
 describe('GET /api/health', () => {
   it('responds with status ok', async () => {
@@ -168,17 +169,17 @@ describe('GET /api/health', () => {
 - [ ] **Step 5: Run test to verify it fails**
 
 Run: `cd server && npx vitest run src/app.test.js`
-Expected: FAIL — `Cannot find module './app'`.
+Expected: FAIL — cannot find module `./app.js`.
 
 - [ ] **Step 6: Create the minimal Express app**
 
 `server/src/app.js`:
 
 ```js
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 
 const app = express();
 
@@ -203,14 +204,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-module.exports = app;
+export default app;
 ```
 
 `server/src/server.js`:
 
 ```js
-require('dotenv').config();
-const app = require('./app');
+import 'dotenv/config.js';
+import app from './app.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -510,8 +511,8 @@ git commit -m "feat(server): add Prisma schema and initial migration"
 `server/src/config/db.test.js`:
 
 ```js
-const { describe, it, expect, beforeAll, afterAll, beforeEach } = require('vitest');
-const { prisma, runWithTenant } = require('./db');
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { prisma, runWithTenant } from './db.js';
 
 describe('tenant-scoped Prisma client', () => {
   let empresaA;
@@ -581,9 +582,9 @@ describe('tenant-scoped Prisma client', () => {
 `server/vitest.config.js`:
 
 ```js
-const { defineConfig } = require('vitest/config');
+import { defineConfig } from 'vitest/config';
 
-module.exports = defineConfig({
+export default defineConfig({
   test: {
     env: { DATABASE_URL: process.env.TEST_DATABASE_URL },
   },
@@ -600,8 +601,8 @@ Expected: FAIL — `Cannot find module './db'`.
 `server/src/config/db.js`:
 
 ```js
-const { PrismaClient } = require('@prisma/client');
-const { AsyncLocalStorage } = require('node:async_hooks');
+import { PrismaClient } from '@prisma/client';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const tenantContext = new AsyncLocalStorage();
 
@@ -645,7 +646,7 @@ function runWithTenant(context, fn) {
   return tenantContext.run(context, fn);
 }
 
-module.exports = { prisma, runWithTenant, tenantContext };
+export { prisma, runWithTenant, tenantContext };
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -679,8 +680,8 @@ git commit -m "feat(server): add tenant-scoped Prisma client via AsyncLocalStora
 `server/src/utils/password.test.js`:
 
 ```js
-const { describe, it, expect } = require('vitest');
-const { hashPassword, verifyPassword } = require('./password');
+import { describe, it, expect } from 'vitest';
+import { hashPassword, verifyPassword } from './password.js';
 
 describe('password utils', () => {
   it('hashes a password and verifies it correctly', async () => {
@@ -695,8 +696,8 @@ describe('password utils', () => {
 `server/src/utils/jwt.test.js`:
 
 ```js
-const { describe, it, expect, beforeAll } = require('vitest');
-const { firmarToken, verificarToken } = require('./jwt');
+import { describe, it, expect, beforeAll } from 'vitest';
+import { firmarToken, verificarToken } from './jwt.js';
 
 describe('jwt utils', () => {
   beforeAll(() => {
@@ -729,7 +730,7 @@ Expected: FAIL — modules don't exist.
 `server/src/utils/password.js`:
 
 ```js
-const bcrypt = require('bcryptjs');
+import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
 
@@ -741,13 +742,13 @@ async function verifyPassword(plain, hash) {
   return bcrypt.compare(plain, hash);
 }
 
-module.exports = { hashPassword, verifyPassword };
+export { hashPassword, verifyPassword };
 ```
 
 `server/src/utils/jwt.js`:
 
 ```js
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 function firmarToken({ sub, empresaId, rol }) {
   return jwt.sign({ empresaId, rol }, process.env.JWT_SECRET, {
@@ -761,7 +762,7 @@ function verificarToken(token) {
   return { sub: decoded.sub, empresaId: decoded.empresaId, rol: decoded.rol, iat: decoded.iat, exp: decoded.exp };
 }
 
-module.exports = { firmarToken, verificarToken };
+export { firmarToken, verificarToken };
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -795,12 +796,12 @@ git commit -m "feat(server): add password hashing and JWT utilities"
 `server/src/middleware/auth.test.js`:
 
 ```js
-const request = require('supertest');
-const express = require('express');
-const { describe, it, expect, beforeAll } = require('vitest');
-const { requireAuth } = require('./auth');
-const { firmarToken } = require('../utils/jwt');
-const { tenantContext } = require('../config/db');
+import request from 'supertest';
+import express from 'express';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { requireAuth } from './auth.js';
+import { firmarToken } from '../utils/jwt.js';
+import { tenantContext } from '../config/db.js';
 
 function buildApp() {
   const app = express();
@@ -841,10 +842,10 @@ describe('requireAuth', () => {
 `server/src/middleware/requireRole.test.js`:
 
 ```js
-const request = require('supertest');
-const express = require('express');
-const { describe, it, expect } = require('vitest');
-const { requireRole } = require('./requireRole');
+import request from 'supertest';
+import express from 'express';
+import { describe, it, expect } from 'vitest';
+import { requireRole } from './requireRole.js';
 
 function buildApp(rolDelUsuario) {
   const app = express();
@@ -879,8 +880,8 @@ Expected: FAIL — modules don't exist.
 `server/src/middleware/auth.js`:
 
 ```js
-const { verificarToken } = require('../utils/jwt');
-const { runWithTenant } = require('../config/db');
+import { verificarToken } from '../utils/jwt.js';
+import { runWithTenant } from '../config/db.js';
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -901,7 +902,7 @@ function requireAuth(req, res, next) {
   runWithTenant({ empresaId: payload.empresaId, usuarioId: payload.sub }, () => next());
 }
 
-module.exports = { requireAuth };
+export { requireAuth };
 ```
 
 `server/src/middleware/requireRole.js`:
@@ -916,7 +917,7 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireRole };
+export { requireRole };
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -950,8 +951,8 @@ git commit -m "feat(server): add requireAuth and requireRole middleware"
 `server/src/utils/money.test.js`:
 
 ```js
-const { describe, it, expect } = require('vitest');
-const { calcularSubtotalLinea, calcularTotalesCotizacion } = require('./money');
+import { describe, it, expect } from 'vitest';
+import { calcularSubtotalLinea, calcularTotalesCotizacion } from './money.js';
 
 describe('calcularSubtotalLinea', () => {
   it('applies quantity, unit price and a percentage discount', () => {
@@ -1009,7 +1010,7 @@ function calcularTotalesCotizacion(lineas, ivaPct) {
   return { subtotal, iva, total };
 }
 
-module.exports = { round2, calcularSubtotalLinea, calcularTotalesCotizacion };
+export { round2, calcularSubtotalLinea, calcularTotalesCotizacion };
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1022,9 +1023,9 @@ Expected: PASS (4 tests).
 `server/src/utils/folio.test.js`:
 
 ```js
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const { prisma } = require('../config/db');
-const { generarFolio, generarFolioDuplicado } = require('./folio');
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { prisma } from '../config/db.js';
+import { generarFolio, generarFolioDuplicado } from './folio.js';
 
 describe('folio utils', () => {
   let empresa;
@@ -1100,7 +1101,7 @@ async function generarFolioDuplicado(prisma, cotizacionOrigen) {
   return `${cotizacionOrigen.folio}-R${hermanos + 1}`;
 }
 
-module.exports = { generarFolio, generarFolioDuplicado };
+export { generarFolio, generarFolioDuplicado };
 ```
 
 - [ ] **Step 8: Run test to verify it passes**
@@ -1131,8 +1132,8 @@ git commit -m "feat(server): add money rounding and folio generation utilities"
 `server/src/modules/cotizaciones/estados.test.js`:
 
 ```js
-const { describe, it, expect } = require('vitest');
-const { puedeTransicionar, siguienteEstado } = require('./estados');
+import { describe, it, expect } from 'vitest';
+import { puedeTransicionar, siguienteEstado } from './estados.js';
 
 describe('máquina de estados de cotización', () => {
   it('permite BORRADOR --enviar--> ENVIADO', () => {
@@ -1202,7 +1203,7 @@ function siguienteEstado(estadoActual, accion) {
   return TRANSICIONES[estadoActual][accion];
 }
 
-module.exports = { TRANSICIONES, puedeTransicionar, siguienteEstado };
+export { TRANSICIONES, puedeTransicionar, siguienteEstado };
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1233,8 +1234,9 @@ git commit -m "feat(server): add pure cotización state machine"
 `server/prisma/seed.js`:
 
 ```js
-const { prisma } = require('../src/config/db');
-const { hashPassword } = require('../src/utils/password');
+import { fileURLToPath } from 'node:url';
+import { prisma } from '../src/config/db.js';
+import { hashPassword } from '../src/utils/password.js';
 
 const ROLES = ['ADMIN', 'GERENTE', 'VENDEDOR', 'CLIENTE'];
 
@@ -1421,7 +1423,7 @@ async function seed() {
   console.log('Seed completo: 2 empresas, 8 usuarios, 24 cotizaciones.');
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   seed()
     .catch((err) => {
       console.error(err);
@@ -1432,7 +1434,7 @@ if (require.main === module) {
     });
 }
 
-module.exports = { seed };
+export { seed };
 ```
 
 - [ ] **Step 2: Run the seed against the dev database**
@@ -1472,12 +1474,12 @@ git commit -m "feat(server): add demo seed script per design-system.md §17"
 `server/src/modules/cotizaciones/cotizaciones.crud.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma, runWithTenant } = require('../../config/db');
-const { hashPassword } = require('../../utils/password');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma, runWithTenant } from '../../config/db.js';
+import { hashPassword } from '../../utils/password.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('Cotizaciones CRUD', () => {
   let empresa;
@@ -1605,10 +1607,10 @@ Expected: FAIL — `app.js` doesn't yet mount `/api/cotizaciones`, module doesn'
 `server/src/modules/cotizaciones/service.js`:
 
 ```js
-const { prisma } = require('../../config/db');
-const { calcularSubtotalLinea, calcularTotalesCotizacion } = require('../../utils/money');
-const { generarFolio, generarFolioDuplicado } = require('../../utils/folio');
-const { puedeTransicionar, siguienteEstado } = require('./estados');
+import { prisma } from '../../config/db.js';
+import { calcularSubtotalLinea, calcularTotalesCotizacion } from '../../utils/money.js';
+import { generarFolio, generarFolioDuplicado } from '../../utils/folio.js';
+import { puedeTransicionar, siguienteEstado } from './estados.js';
 
 function alcanceLectura(usuario) {
   if (usuario.rol === 'ADMIN' || usuario.rol === 'GERENTE') return {};
@@ -1741,7 +1743,7 @@ async function actualizar({ usuario, id, datos }) {
   });
 }
 
-module.exports = { listar, obtener, crear, actualizar, alcanceLectura, puedeTransicionar, siguienteEstado, generarFolioDuplicado };
+export { listar, obtener, crear, actualizar, alcanceLectura, puedeTransicionar, siguienteEstado, generarFolioDuplicado };
 ```
 
 - [ ] **Step 4: Implement the controller**
@@ -1749,8 +1751,8 @@ module.exports = { listar, obtener, crear, actualizar, alcanceLectura, puedeTran
 `server/src/modules/cotizaciones/controller.js`:
 
 ```js
-const { z } = require('zod');
-const service = require('./service');
+import { z } from 'zod';
+import * as service from './service.js';
 
 const lineaSchema = z.object({
   catalogoItemId: z.string().optional(),
@@ -1814,7 +1816,7 @@ async function actualizar(req, res, next) {
   }
 }
 
-module.exports = { listar, obtener, crear, actualizar };
+export { listar, obtener, crear, actualizar };
 ```
 
 - [ ] **Step 5: Implement the routes and mount them**
@@ -1822,10 +1824,10 @@ module.exports = { listar, obtener, crear, actualizar };
 `server/src/modules/cotizaciones/routes.js`:
 
 ```js
-const { Router } = require('express');
-const { requireAuth } = require('../../middleware/auth');
-const { requireRole } = require('../../middleware/requireRole');
-const controller = require('./controller');
+import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import * as controller from './controller.js';
 
 const router = Router();
 
@@ -1835,13 +1837,13 @@ router.get('/:id', controller.obtener);
 router.post('/', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.crear);
 router.patch('/:id', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.actualizar);
 
-module.exports = router;
+export default router;
 ```
 
 Modify `server/src/app.js` — add near the top, after `const app = express();` block's middleware setup and before the 404 handler:
 
 ```js
-const cotizacionesRoutes = require('./modules/cotizaciones/routes');
+import cotizacionesRoutes from './modules/cotizaciones/routes.js';
 app.use('/api/cotizaciones', cotizacionesRoutes);
 ```
 
@@ -1876,11 +1878,11 @@ git commit -m "feat(server): add cotizaciones create/list/get/patch with server-
 `server/src/modules/cotizaciones/cotizaciones.acciones.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma, runWithTenant } = require('../../config/db');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma, runWithTenant } from '../../config/db.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('Cotizaciones — acciones de flujo', () => {
   let empresa;
@@ -1970,7 +1972,7 @@ Expected: FAIL — routes don't exist yet (404s).
 
 - [ ] **Step 3: Add `transicionar` and `duplicar` to the service**
 
-Append to `server/src/modules/cotizaciones/service.js`, before `module.exports`:
+Append to `server/src/modules/cotizaciones/service.js`, before the trailing `export { ... }`:
 
 ```js
 async function transicionar({ usuario, id, accion, comentario }) {
@@ -2027,17 +2029,17 @@ async function duplicar({ usuario, id }) {
 }
 ```
 
-Update the `module.exports` line at the bottom of `service.js` to also include `transicionar, duplicar`:
+Update the `export { ... }` line at the bottom of `service.js` to also include `transicionar, duplicar`:
 
 ```js
-module.exports = { listar, obtener, crear, actualizar, transicionar, duplicar };
+export { listar, obtener, crear, actualizar, transicionar, duplicar };
 ```
 
-(Drop the earlier re-exports of `alcanceLectura`, `puedeTransicionar`, `siguienteEstado`, `generarFolioDuplicado` from Task 10's `module.exports` — they were only ever used internally within this file, not by the controller.)
+(Drop the earlier re-exports of `alcanceLectura`, `puedeTransicionar`, `siguienteEstado`, `generarFolioDuplicado` from Task 10's `export { ... }` — they were only ever used internally within this file, not by the controller.)
 
 - [ ] **Step 4: Add controller actions**
 
-Append to `server/src/modules/cotizaciones/controller.js`, before `module.exports`:
+Append to `server/src/modules/cotizaciones/controller.js`, before the trailing `export { ... }`:
 
 ```js
 function manejarErrorTransicion(err, res, next) {
@@ -2087,12 +2089,12 @@ async function duplicar(req, res, next) {
   }
 }
 
-module.exports = { listar, obtener, crear, actualizar, enviar, aprobar, rechazar, duplicar };
+export { listar, obtener, crear, actualizar, enviar, aprobar, rechazar, duplicar };
 ```
 
 - [ ] **Step 5: Add the routes**
 
-Modify `server/src/modules/cotizaciones/routes.js` — insert before `module.exports = router;`:
+Modify `server/src/modules/cotizaciones/routes.js` — insert before `export default router;`:
 
 ```js
 router.post('/:id/enviar', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.enviar);
@@ -2138,11 +2140,11 @@ git commit -m "feat(server): add cotizaciones enviar/aprobar/rechazar/duplicar a
 `server/src/modules/auth/auth.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma } = require('../../config/db');
-const { hashPassword } = require('../../utils/password');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma } from '../../config/db.js';
+import { hashPassword } from '../../utils/password.js';
 
 describe('Auth', () => {
   let empresaA;
@@ -2225,9 +2227,9 @@ Expected: FAIL — routes don't exist (404s).
 `server/src/modules/auth/service.js`:
 
 ```js
-const { prisma } = require('../../config/db');
-const { verifyPassword } = require('../../utils/password');
-const { firmarToken } = require('../../utils/jwt');
+import { prisma } from '../../config/db.js';
+import { verifyPassword } from '../../utils/password.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 function serializarUsuario(usuario) {
   return { id: usuario.id, empresaId: usuario.empresaId, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, clienteId: usuario.clienteId };
@@ -2266,7 +2268,7 @@ async function switchEmpresa({ usuarioId, empresaId }) {
   return { token };
 }
 
-module.exports = { login, demoLogin, me, switchEmpresa };
+export { login, demoLogin, me, switchEmpresa };
 ```
 
 Note: `demo-login` intentionally always resolves within `Empresa A` (the "COT-A" prefix seeded in Task 9) — the mockup's quick-access buttons log in without asking which company first, matching `design-system.md` §9.3; Admin can switch afterward.
@@ -2276,8 +2278,8 @@ Note: `demo-login` intentionally always resolves within `Empresa A` (the "COT-A"
 `server/src/modules/auth/controller.js`:
 
 ```js
-const { z } = require('zod');
-const service = require('./service');
+import { z } from 'zod';
+import * as service from './service.js';
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 const demoLoginSchema = z.object({ rol: z.enum(['ADMIN', 'GERENTE', 'VENDEDOR', 'CLIENTE']) });
@@ -2329,7 +2331,7 @@ async function switchEmpresa(req, res, next) {
   }
 }
 
-module.exports = { login, demoLogin, me, switchEmpresa };
+export { login, demoLogin, me, switchEmpresa };
 ```
 
 - [ ] **Step 5: Implement the routes and mount them**
@@ -2337,10 +2339,10 @@ module.exports = { login, demoLogin, me, switchEmpresa };
 `server/src/modules/auth/routes.js`:
 
 ```js
-const { Router } = require('express');
-const { requireAuth } = require('../../middleware/auth');
-const { requireRole } = require('../../middleware/requireRole');
-const controller = require('./controller');
+import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import * as controller from './controller.js';
 
 const router = Router();
 
@@ -2349,13 +2351,13 @@ router.post('/demo-login', controller.demoLogin);
 router.get('/me', requireAuth, controller.me);
 router.post('/switch-empresa', requireAuth, requireRole('ADMIN'), controller.switchEmpresa);
 
-module.exports = router;
+export default router;
 ```
 
 Modify `server/src/app.js` — add alongside the cotizaciones mount:
 
 ```js
-const authRoutes = require('./modules/auth/routes');
+import authRoutes from './modules/auth/routes.js';
 app.use('/api/auth', authRoutes);
 ```
 
@@ -2391,11 +2393,11 @@ git commit -m "feat(server): add login, demo-login, me and switch-empresa endpoi
 `server/src/modules/clientes/clientes.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma } = require('../../config/db');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma } from '../../config/db.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('Clientes CRUD', () => {
   let empresa;
@@ -2444,7 +2446,7 @@ Expected: FAIL — routes don't exist (404s).
 `server/src/modules/clientes/service.js`:
 
 ```js
-const { prisma } = require('../../config/db');
+import { prisma } from '../../config/db.js';
 
 async function listar() {
   return prisma.cliente.findMany({ orderBy: { nombre: 'asc' } });
@@ -2471,14 +2473,14 @@ async function eliminar(id) {
   return true;
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+export { listar, obtener, crear, actualizar, eliminar };
 ```
 
 `server/src/modules/clientes/controller.js`:
 
 ```js
-const { z } = require('zod');
-const service = require('./service');
+import { z } from 'zod';
+import * as service from './service.js';
 
 const clienteSchema = z.object({
   nombre: z.string().min(1),
@@ -2524,16 +2526,16 @@ async function eliminar(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+export { listar, obtener, crear, actualizar, eliminar };
 ```
 
 `server/src/modules/clientes/routes.js`:
 
 ```js
-const { Router } = require('express');
-const { requireAuth } = require('../../middleware/auth');
-const { requireRole } = require('../../middleware/requireRole');
-const controller = require('./controller');
+import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import * as controller from './controller.js';
 
 const router = Router();
 
@@ -2544,13 +2546,13 @@ router.post('/', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.crear);
 router.patch('/:id', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.actualizar);
 router.delete('/:id', requireRole('ADMIN', 'GERENTE'), controller.eliminar);
 
-module.exports = router;
+export default router;
 ```
 
 Modify `server/src/app.js`:
 
 ```js
-const clientesRoutes = require('./modules/clientes/routes');
+import clientesRoutes from './modules/clientes/routes.js';
 app.use('/api/clientes', clientesRoutes);
 ```
 
@@ -2585,11 +2587,11 @@ git commit -m "feat(server): add clientes CRUD"
 `server/src/modules/catalogo/catalogo.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma } = require('../../config/db');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma } from '../../config/db.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('Catálogo CRUD', () => {
   let empresa;
@@ -2642,7 +2644,7 @@ Expected: FAIL — routes don't exist (404s).
 `server/src/modules/catalogo/service.js`:
 
 ```js
-const { prisma } = require('../../config/db');
+import { prisma } from '../../config/db.js';
 
 async function listar() {
   return prisma.catalogoItem.findMany({ orderBy: { nombre: 'asc' } });
@@ -2669,14 +2671,14 @@ async function eliminar(id) {
   return true;
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+export { listar, obtener, crear, actualizar, eliminar };
 ```
 
 `server/src/modules/catalogo/controller.js`:
 
 ```js
-const { z } = require('zod');
-const service = require('./service');
+import { z } from 'zod';
+import * as service from './service.js';
 
 const itemSchema = z.object({
   nombre: z.string().min(1),
@@ -2721,16 +2723,16 @@ async function eliminar(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+export { listar, obtener, crear, actualizar, eliminar };
 ```
 
 `server/src/modules/catalogo/routes.js`:
 
 ```js
-const { Router } = require('express');
-const { requireAuth } = require('../../middleware/auth');
-const { requireRole } = require('../../middleware/requireRole');
-const controller = require('./controller');
+import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import * as controller from './controller.js';
 
 const router = Router();
 
@@ -2741,13 +2743,13 @@ router.post('/', requireRole('ADMIN', 'GERENTE'), controller.crear);
 router.patch('/:id', requireRole('ADMIN', 'GERENTE'), controller.actualizar);
 router.delete('/:id', requireRole('ADMIN', 'GERENTE'), controller.eliminar);
 
-module.exports = router;
+export default router;
 ```
 
 Modify `server/src/app.js`:
 
 ```js
-const catalogoRoutes = require('./modules/catalogo/routes');
+import catalogoRoutes from './modules/catalogo/routes.js';
 app.use('/api/catalogo', catalogoRoutes);
 ```
 
@@ -2782,11 +2784,11 @@ git commit -m "feat(server): add catálogo CRUD"
 `server/src/modules/dashboard/dashboard.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma, runWithTenant } = require('../../config/db');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma, runWithTenant } from '../../config/db.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('Dashboard', () => {
   let empresa;
@@ -2841,7 +2843,7 @@ Expected: FAIL — route doesn't exist (404).
 `server/src/modules/dashboard/service.js`:
 
 ```js
-const { prisma } = require('../../config/db');
+import { prisma } from '../../config/db.js';
 
 async function obtenerResumen() {
   const [borradores, enviadas, aprobadas, aprobadasAgg] = await Promise.all([
@@ -2859,13 +2861,13 @@ async function obtenerResumen() {
   };
 }
 
-module.exports = { obtenerResumen };
+export { obtenerResumen };
 ```
 
 `server/src/modules/dashboard/controller.js`:
 
 ```js
-const service = require('./service');
+import * as service from './service.js';
 
 async function resumen(req, res, next) {
   try {
@@ -2875,27 +2877,27 @@ async function resumen(req, res, next) {
   }
 }
 
-module.exports = { resumen };
+export { resumen };
 ```
 
 `server/src/modules/dashboard/routes.js`:
 
 ```js
-const { Router } = require('express');
-const { requireAuth } = require('../../middleware/auth');
-const controller = require('./controller');
+import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
+import * as controller from './controller.js';
 
 const router = Router();
 
 router.get('/', requireAuth, controller.resumen);
 
-module.exports = router;
+export default router;
 ```
 
 Modify `server/src/app.js`:
 
 ```js
-const dashboardRoutes = require('./modules/dashboard/routes');
+import dashboardRoutes from './modules/dashboard/routes.js';
 app.use('/api/dashboard', dashboardRoutes);
 ```
 
@@ -2930,11 +2932,11 @@ git commit -m "feat(server): add dashboard KPI endpoint"
 `server/src/modules/pdf/pdf.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma, runWithTenant } = require('../../config/db');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma, runWithTenant } from '../../config/db.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('PDF export', () => {
   let empresa;
@@ -2988,8 +2990,8 @@ Expected: FAIL — route doesn't exist (404).
 `server/src/modules/pdf/template.js`:
 
 ```js
-const React = require('react');
-const { Document, Page, View, Text, StyleSheet } = require('@react-pdf/renderer');
+import React from 'react';
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 9, fontFamily: 'Helvetica' },
@@ -3054,7 +3056,7 @@ function CotizacionDocument({ cotizacion }) {
   );
 }
 
-module.exports = { CotizacionDocument };
+export { CotizacionDocument };
 ```
 
 - [ ] **Step 4: Add the route and mount it inside the cotizaciones router**
@@ -3062,10 +3064,10 @@ module.exports = { CotizacionDocument };
 `server/src/modules/pdf/routes.js`:
 
 ```js
-const { renderToStream } = require('@react-pdf/renderer');
-const React = require('react');
-const cotizacionesService = require('../cotizaciones/service');
-const { CotizacionDocument } = require('./template');
+import { renderToStream } from '@react-pdf/renderer';
+import React from 'react';
+import * as cotizacionesService from '../cotizaciones/service.js';
+import { CotizacionDocument } from './template.js';
 
 async function descargarPdf(req, res, next) {
   try {
@@ -3081,13 +3083,18 @@ async function descargarPdf(req, res, next) {
   }
 }
 
-module.exports = { descargarPdf };
+export { descargarPdf };
 ```
 
-Modify `server/src/modules/cotizaciones/routes.js` — add near the other `GET /:id...` routes:
+Modify `server/src/modules/cotizaciones/routes.js` — add the import alongside the file's other imports at the top:
 
 ```js
-const pdfRoutes = require('../pdf/routes');
+import * as pdfRoutes from '../pdf/routes.js';
+```
+
+—and add the route near the other `GET /:id...` routes:
+
+```js
 router.get('/:id/pdf', pdfRoutes.descargarPdf);
 ```
 
@@ -3122,11 +3129,11 @@ git commit -m "feat(server): add PDF export via @react-pdf/renderer"
 `server/src/modules/demo/demo.test.js`:
 
 ```js
-const request = require('supertest');
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const app = require('../../app');
-const { prisma } = require('../../config/db');
-const { firmarToken } = require('../../utils/jwt');
+import request from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import app from '../../app.js';
+import { prisma } from '../../config/db.js';
+import { firmarToken } from '../../utils/jwt.js';
 
 describe('Demo reset', () => {
   afterAll(async () => {
@@ -3157,7 +3164,7 @@ Expected: FAIL — route doesn't exist (404).
 `server/src/modules/demo/controller.js`:
 
 ```js
-const { seed } = require('../../../prisma/seed');
+import { seed } from '../../../prisma/seed.js';
 
 async function reset(req, res, next) {
   try {
@@ -3168,27 +3175,27 @@ async function reset(req, res, next) {
   }
 }
 
-module.exports = { reset };
+export { reset };
 ```
 
 `server/src/modules/demo/routes.js`:
 
 ```js
-const { Router } = require('express');
-const { requireAuth } = require('../../middleware/auth');
-const controller = require('./controller');
+import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
+import * as controller from './controller.js';
 
 const router = Router();
 
 router.post('/reset', requireAuth, controller.reset);
 
-module.exports = router;
+export default router;
 ```
 
 Modify `server/src/app.js`:
 
 ```js
-const demoRoutes = require('./modules/demo/routes');
+import demoRoutes from './modules/demo/routes.js';
 app.use('/api/demo', demoRoutes);
 ```
 
