@@ -7,6 +7,7 @@ import { firmarToken } from '../../utils/jwt.js';
 
 describe('Cotizaciones CRUD', () => {
   let empresa;
+  let otraEmpresa;
   let vendedor;
   let cliente;
   let tokenVendedor;
@@ -28,6 +29,13 @@ describe('Cotizaciones CRUD', () => {
   });
 
   afterAll(async () => {
+    const empresaIds = [empresa.id, otraEmpresa?.id].filter(Boolean);
+    await prisma.cotizacionEvento.deleteMany({ where: { cotizacion: { empresaId: { in: empresaIds } } } });
+    await prisma.cotizacionLinea.deleteMany({ where: { cotizacion: { empresaId: { in: empresaIds } } } });
+    await prisma.cotizacion.deleteMany({ where: { empresaId: { in: empresaIds } } });
+    await prisma.usuario.deleteMany({ where: { empresaId: { in: empresaIds } } });
+    await prisma.cliente.deleteMany({ where: { empresaId: { in: empresaIds } } });
+    await prisma.empresa.deleteMany({ where: { id: { in: empresaIds } } });
     await prisma.$disconnect();
   });
 
@@ -53,7 +61,7 @@ describe('Cotizaciones CRUD', () => {
   });
 
   it('rechaza crear una cotización con datos de otra empresa (clienteId ajeno)', async () => {
-    const otraEmpresa = await prisma.empresa.create({
+    otraEmpresa = await prisma.empresa.create({
       data: { nombre: 'Otra Co', ruc: '556', prefijoFolio: 'COT-Y' },
     });
     const clienteAjeno = await runWithTenant({ empresaId: otraEmpresa.id }, () =>
