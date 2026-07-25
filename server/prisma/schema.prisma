@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  ADMIN
+  GERENTE
+  VENDEDOR
+  CLIENTE
+}
+
+enum EstadoCotizacion {
+  BORRADOR
+  ENVIADO
+  APROBADO
+  RECHAZADO
+  VENCIDO
+}
+
+enum TipoCatalogo {
+  PRODUCTO
+  SERVICIO
+}
+
+enum TipoEvento {
+  CREADA
+  ENVIADA
+  APROBADA
+  RECHAZADA
+  DEVUELTA
+  VENCIDA
+}
+
+model Empresa {
+  id             String   @id @default(cuid())
+  nombre         String
+  ruc            String
+  logoUrl        String?
+  ivaPct         Decimal  @default(15)
+  prefijoFolio   String
+  siguienteFolio Int      @default(1)
+  createdAt      DateTime @default(now())
+
+  usuarios     Usuario[]
+  clientes     Cliente[]
+  catalogo     CatalogoItem[]
+  cotizaciones Cotizacion[]
+}
+
+model Usuario {
+  id           String   @id @default(cuid())
+  empresaId    String
+  nombre       String
+  email        String   @unique
+  passwordHash String
+  rol          Rol
+  clienteId    String?
+  createdAt    DateTime @default(now())
+
+  empresa              Empresa            @relation(fields: [empresaId], references: [id])
+  clienteRepresentado  Cliente?           @relation(fields: [clienteId], references: [id])
+  cotizacionesVendedor Cotizacion[]       @relation("Vendedor")
+  eventos              CotizacionEvento[]
+}
+
+model Cliente {
+  id        String   @id @default(cuid())
+  empresaId String
+  nombre    String
+  ruc       String
+  email     String?
+  telefono  String?
+  direccion String?
+  createdAt DateTime @default(now())
+
+  empresa      Empresa      @relation(fields: [empresaId], references: [id])
+  cotizaciones Cotizacion[]
+  usuarios     Usuario[]
+}
+
+model CatalogoItem {
+  id             String       @id @default(cuid())
+  empresaId      String
+  nombre         String
+  descripcion    String?
+  tipo           TipoCatalogo
+  precioUnitario Decimal
+  createdAt      DateTime     @default(now())
+
+  empresa Empresa            @relation(fields: [empresaId], references: [id])
+  lineas  CotizacionLinea[]
+}
+
+model Cotizacion {
+  id                String           @id @default(cuid())
+  empresaId         String
+  folio             String
+  clienteId         String
+  vendedorId        String
+  estado            EstadoCotizacion @default(BORRADOR)
+  subtotal          Decimal
+  descuentoTotal    Decimal          @default(0)
+  iva               Decimal
+  total             Decimal
+  fechaEmision      DateTime         @default(now())
+  fechaValidez      DateTime
+  cotizacionPadreId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  empresa         Empresa            @relation(fields: [empresaId], references: [id])
+  cliente         Cliente            @relation(fields: [clienteId], references: [id])
+  vendedor        Usuario            @relation("Vendedor", fields: [vendedorId], references: [id])
+  cotizacionPadre Cotizacion?        @relation("Duplicados", fields: [cotizacionPadreId], references: [id])
+  duplicados      Cotizacion[]       @relation("Duplicados")
+  lineas          CotizacionLinea[]
+  eventos         CotizacionEvento[]
+
+  @@unique([empresaId, folio])
+}
+
+model CotizacionLinea {
+  id             String   @id @default(cuid())
+  cotizacionId   String
+  catalogoItemId String?
+  descripcion    String
+  cantidad       Decimal
+  precioUnitario Decimal
+  descuentoPct   Decimal  @default(0)
+  subtotal       Decimal
+  orden          Int
+
+  cotizacion   Cotizacion    @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  catalogoItem CatalogoItem? @relation(fields: [catalogoItemId], references: [id])
+}
+
+model CotizacionEvento {
+  id           String     @id @default(cuid())
+  cotizacionId String
+  tipo         TipoEvento
+  actorId      String
+  comentario   String?
+  createdAt    DateTime   @default(now())
+
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  actor      Usuario    @relation(fields: [actorId], references: [id])
+}
