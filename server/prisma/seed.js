@@ -170,13 +170,15 @@ async function seed() {
     ...Array(2).fill('VENCIDO'),
   ]; // 24 total, coincide con design-system.md §17
 
-  for (const [empresa, usuarios, clientes] of [
+  const empresas = [
     [empresaA.empresa, empresaA.usuarios, empresaA.clientes],
     [empresaB.empresa, empresaB.usuarios, empresaB.clientes],
-  ]) {
-    for (let i = 0; i < distribucion.length / 2; i += 1) {
-      const estado = distribucion[i];
-      const cliente = clientes[i % clientes.length];
+  ];
+  const mitad = distribucion.length / 2;
+  for (const [empresaIdx, [empresa, usuarios, clientes]] of empresas.entries()) {
+    for (let j = 0; j < mitad; j += 1) {
+      const estado = distribucion[empresaIdx * mitad + j];
+      const cliente = clientes[j % clientes.length];
       const vendedor = usuarios.VENDEDOR;
       const diasAtras = Math.floor(Math.random() * 90) + (estado === 'VENCIDO' ? 30 : 0);
       const montoAprox = 320 + Math.random() * (18400 - 320);
