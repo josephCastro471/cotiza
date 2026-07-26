@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import ResumenPage from './pages/ResumenPage';
 import CotizacionesListPage from './features/cotizaciones/CotizacionesListPage';
 import CotizacionEditorPage from './features/cotizaciones/CotizacionEditorPage';
+import CotizacionDetallePage from './features/cotizaciones/CotizacionDetallePage';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
                 <Route path="/" element={<ResumenPage />} />
                 <Route path="/cotizaciones" element={<CotizacionesListPage />} />
                 <Route path="/cotizaciones/nueva" element={<CotizacionEditorPage />} />
+                <Route path="/cotizaciones/:id" element={<CotizacionDetallePage />} />
               </Route>
             </Route>
           </Routes>
