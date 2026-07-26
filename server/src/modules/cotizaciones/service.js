@@ -72,7 +72,7 @@ async function obtener({ usuario, id }) {
   const where = { AND: [{ id }, alcanceLectura(usuario)] };
   const cotizacion = await prisma.cotizacion.findFirst({
     where,
-    include: { cliente: true, vendedor: true, lineas: true, eventos: { orderBy: { createdAt: 'asc' }, include: { actor: true } } },
+    include: { cliente: true, vendedor: true, lineas: true, empresa: true, eventos: { orderBy: { createdAt: 'asc' }, include: { actor: true } } },
   });
   if (!cotizacion) return null;
   const [actualizada] = await marcarVencidasSiCorresponde([cotizacion]);
