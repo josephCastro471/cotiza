@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma, runWithTenant } from './db.js';
 
 describe('tenant-scoped Prisma client', () => {
@@ -6,15 +6,6 @@ describe('tenant-scoped Prisma client', () => {
   let empresaB;
 
   beforeAll(async () => {
-    await prisma.$transaction([
-      prisma.cotizacionEvento.deleteMany(),
-      prisma.cotizacionLinea.deleteMany(),
-      prisma.cotizacion.deleteMany(),
-      prisma.catalogoItem.deleteMany(),
-      prisma.usuario.deleteMany(),
-      prisma.cliente.deleteMany(),
-      prisma.empresa.deleteMany(),
-    ]);
     empresaA = await prisma.empresa.create({
       data: { nombre: 'Empresa A', ruc: '000A', prefijoFolio: 'COT-A' },
     });
@@ -24,6 +15,9 @@ describe('tenant-scoped Prisma client', () => {
   });
 
   afterAll(async () => {
+    const empresaIds = [empresaA?.id, empresaB?.id].filter(Boolean);
+    await prisma.cliente.deleteMany({ where: { empresaId: { in: empresaIds } } });
+    await prisma.empresa.deleteMany({ where: { id: { in: empresaIds } } });
     await prisma.$disconnect();
   });
 
