@@ -134,4 +134,57 @@ async function actualizar({ usuario, id, datos }) {
   });
 }
 
-export { listar, obtener, crear, actualizar, alcanceLectura, puedeTransicionar, siguienteEstado, generarFolioDuplicado };
+async function transicionar({ usuario, id, accion, comentario }) {
+  const cotizacion = await prisma.cotizacion.findFirst({ where: { id, empresaId: usuario.empresaId } });
+  if (!cotizacion) return null;
+
+  const nuevoEstado = siguienteEstado(cotizacion.estado, accion); // throws TRANSICION_INVALIDA if not allowed
+
+  const tipoEvento = { enviar: 'ENVIADA', aprobar: 'APROBADA', rechazar: 'RECHAZADA', devolver: 'DEVUELTA' }[accion];
+
+  return prisma.cotizacion.update({
+    where: { id },
+    data: {
+      estado: nuevoEstado,
+      eventos: { create: [{ tipo: tipoEvento, actorId: usuario.id, comentario: comentario || null }] },
+    },
+    include: { lineas: true, eventos: { include: { actor: true } } },
+  });
+}
+
+async function duplicar({ usuario, id }) {
+  const original = await prisma.cotizacion.findFirst({ where: { id, empresaId: usuario.empresaId }, include: { lineas: true } });
+  if (!original) return null;
+
+  const folio = await generarFolioDuplicado(prisma, original);
+
+  return prisma.cotizacion.create({
+    data: {
+      empresaId: usuario.empresaId,
+      folio,
+      clienteId: original.clienteId,
+      vendedorId: usuario.id,
+      estado: 'BORRADOR',
+      subtotal: original.subtotal,
+      iva: original.iva,
+      total: original.total,
+      fechaValidez: original.fechaValidez,
+      cotizacionPadreId: original.id,
+      lineas: {
+        create: original.lineas.map((l) => ({
+          catalogoItemId: l.catalogoItemId,
+          descripcion: l.descripcion,
+          cantidad: l.cantidad,
+          precioUnitario: l.precioUnitario,
+          descuentoPct: l.descuentoPct,
+          subtotal: l.subtotal,
+          orden: l.orden,
+        })),
+      },
+      eventos: { create: [{ tipo: 'CREADA', actorId: usuario.id, comentario: `Duplicado de ${original.folio}` }] },
+    },
+    include: { lineas: true },
+  });
+}
+
+export { listar, obtener, crear, actualizar, transicionar, duplicar };

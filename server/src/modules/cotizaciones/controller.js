@@ -104,4 +104,51 @@ async function actualizar(req, res, next) {
   }
 }
 
-export { listar, obtener, crear, actualizar };
+function manejarErrorTransicion(err, res, next) {
+  if (err.code === 'TRANSICION_INVALIDA') {
+    return res.status(409).json({ error: { message: err.message, code: err.code } });
+  }
+  next(err);
+}
+
+async function enviar(req, res, next) {
+  try {
+    const cot = await service.transicionar({ usuario: req.usuario, id: req.params.id, accion: 'enviar' });
+    if (!cot) return res.status(404).json({ error: { message: 'Cotización no encontrada.', code: 'NOT_FOUND' } });
+    res.json(serializarCotizacion(cot));
+  } catch (err) {
+    manejarErrorTransicion(err, res, next);
+  }
+}
+
+async function aprobar(req, res, next) {
+  try {
+    const cot = await service.transicionar({ usuario: req.usuario, id: req.params.id, accion: 'aprobar' });
+    if (!cot) return res.status(404).json({ error: { message: 'Cotización no encontrada.', code: 'NOT_FOUND' } });
+    res.json(serializarCotizacion(cot));
+  } catch (err) {
+    manejarErrorTransicion(err, res, next);
+  }
+}
+
+async function rechazar(req, res, next) {
+  try {
+    const cot = await service.transicionar({ usuario: req.usuario, id: req.params.id, accion: 'rechazar', comentario: req.body.comentario });
+    if (!cot) return res.status(404).json({ error: { message: 'Cotización no encontrada.', code: 'NOT_FOUND' } });
+    res.json(serializarCotizacion(cot));
+  } catch (err) {
+    manejarErrorTransicion(err, res, next);
+  }
+}
+
+async function duplicar(req, res, next) {
+  try {
+    const cot = await service.duplicar({ usuario: req.usuario, id: req.params.id });
+    if (!cot) return res.status(404).json({ error: { message: 'Cotización no encontrada.', code: 'NOT_FOUND' } });
+    res.status(201).json(serializarCotizacion(cot));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export { listar, obtener, crear, actualizar, enviar, aprobar, rechazar, duplicar };
