@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [entrandoComo, setEntrandoComo] = useState(null);
   const { login, demoLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -25,20 +26,32 @@ export default function LoginPage() {
     try {
       await login(email, password);
       navigate('/');
-    } catch {
-      setError('El correo o la contraseña no coinciden. Verifica e intenta de nuevo.');
+    } catch (err) {
+      setError(
+        err.response
+          ? 'El correo o la contraseña no coinciden. Verifica e intenta de nuevo.'
+          : 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.'
+      );
     } finally {
       setEnviando(false);
     }
   }
 
   async function entrarComo(rol) {
+    if (entrandoComo) return;
     setError('');
+    setEntrandoComo(rol);
     try {
       await demoLogin(rol);
       navigate('/');
-    } catch {
-      setError('No se pudo iniciar la demo para ese rol. Intenta de nuevo.');
+    } catch (err) {
+      setError(
+        err.response
+          ? 'No se pudo iniciar la demo para ese rol. Intenta de nuevo.'
+          : 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.'
+      );
+    } finally {
+      setEntrandoComo(null);
     }
   }
 
@@ -80,8 +93,14 @@ export default function LoginPage() {
             <p className="text-small text-ink-500 mb-2">Entrar como:</p>
             <div className="flex flex-wrap gap-2">
               {ROLES_DEMO.map(({ rol, label }) => (
-                <Button key={rol} type="button" variant="secondary" onClick={() => entrarComo(rol)}>
-                  {label}
+                <Button
+                  key={rol}
+                  type="button"
+                  variant="secondary"
+                  onClick={() => entrarComo(rol)}
+                  disabled={!!entrandoComo}
+                >
+                  {entrandoComo === rol ? 'Entrando…' : label}
                 </Button>
               ))}
             </div>
