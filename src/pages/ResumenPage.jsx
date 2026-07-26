@@ -10,14 +10,16 @@ export default function ResumenPage() {
   const [kpis, setKpis] = useState(null);
   const [recientes, setRecientes] = useState([]);
   const [pendientes, setPendientes] = useState([]);
+  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/dashboard').then((res) => setKpis(res.data));
-    api.get('/cotizaciones').then((res) => setRecientes(res.data.slice(0, 6)));
-    api.get('/cotizaciones', { params: { estado: 'ENVIADO' } }).then((res) => setPendientes(res.data.slice(0, 3)));
+    api.get('/dashboard').then((res) => setKpis(res.data)).catch(() => setError(true));
+    api.get('/cotizaciones').then((res) => setRecientes(res.data.slice(0, 6))).catch(() => setError(true));
+    api.get('/cotizaciones', { params: { estado: 'ENVIADO' } }).then((res) => setPendientes(res.data.slice(0, 3))).catch(() => setError(true));
   }, []);
 
+  if (error) return <div className="p-6 text-small text-danger">No se pudo cargar el resumen. Intenta de nuevo.</div>;
   if (!kpis) return null;
 
   return (
@@ -42,7 +44,7 @@ export default function ResumenPage() {
         ].map(([label, valor]) => (
           <div key={label} className="bg-surface border border-line rounded-card p-4">
             <div className="text-label uppercase">{label}</div>
-            <div className="font-mono tabular text-display font-semibold mt-1.5">{valor}</div>
+            <div className="font-mono tabular text-right text-display font-semibold mt-1.5">{valor}</div>
           </div>
         ))}
       </div>
