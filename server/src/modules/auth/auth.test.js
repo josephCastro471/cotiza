@@ -65,6 +65,7 @@ describe('Auth', () => {
 
     const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${switchRes.body.token}`);
     expect(me.body.empresaId).toBe(empresaB.id);
+    expect(me.body.nombreEmpresa).toBe(empresaB.nombre);
   });
 
   it('switch-empresa devuelve 403 para un rol distinto de ADMIN', async () => {

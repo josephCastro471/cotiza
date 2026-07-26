@@ -9,5 +9,6 @@ router.post('/login', controller.login);
 router.post('/demo-login', controller.demoLogin);
 router.get('/me', requireAuth, controller.me);
 router.post('/switch-empresa', requireAuth, requireRole('ADMIN'), controller.switchEmpresa);
+router.get('/empresas', requireAuth, requireRole('ADMIN'), controller.listarEmpresas);
 
 export default router;

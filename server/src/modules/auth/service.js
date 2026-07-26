@@ -2,8 +2,8 @@ import { prisma, runWithTenant } from '../../config/db.js';
 import { verifyPassword } from '../../utils/password.js';
 import { firmarToken } from '../../utils/jwt.js';
 
-function serializarUsuario(usuario) {
-  return { id: usuario.id, empresaId: usuario.empresaId, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, clienteId: usuario.clienteId };
+function serializarUsuario(usuario, empresa) {
+  return { id: usuario.id, empresaId: usuario.empresaId, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, clienteId: usuario.clienteId, nombreEmpresa: empresa?.nombre };
 }
 
 // Looks up the authenticated usuario by primary key, bypassing the automatic
@@ -21,8 +21,9 @@ async function login({ email, password }) {
   if (!usuario) return null;
   const valido = await verifyPassword(password, usuario.passwordHash);
   if (!valido) return null;
+  const empresa = await prisma.empresa.findUnique({ where: { id: usuario.empresaId } });
   const token = firmarToken({ sub: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol, clienteId: usuario.clienteId });
-  return { token, usuario: serializarUsuario(usuario) };
+  return { token, usuario: serializarUsuario(usuario, empresa) };
 }
 
 async function demoLogin({ rol }) {
@@ -31,17 +32,24 @@ async function demoLogin({ rol }) {
     orderBy: { createdAt: 'asc' },
   });
   if (!usuario) return null;
+  const empresa = await prisma.empresa.findUnique({ where: { id: usuario.empresaId } });
   const token = firmarToken({ sub: usuario.id, empresaId: usuario.empresaId, rol: usuario.rol, clienteId: usuario.clienteId });
-  return { token, usuario: serializarUsuario(usuario) };
+  return { token, usuario: serializarUsuario(usuario, empresa) };
 }
 
 async function me({ id, empresaId }) {
   const usuario = await buscarUsuarioPorId(id);
   if (!usuario) return null;
+  // Fetch the empresa by the *active* tenant (the empresaId param, from the
+  // caller's JWT), not usuario.empresaId (the admin's static home company) —
+  // after switchEmpresa these can differ, and both empresaId and
+  // nombreEmpresa in /me's response must reflect the empresa the admin is
+  // currently viewing, not the one they originally logged into.
+  const empresa = await prisma.empresa.findUnique({ where: { id: empresaId } });
   // Report the currently active tenant context (the token's empresaId),
   // not the usuario row's static home empresaId — after switchEmpresa these
   // can differ, and /me should reflect the empresa the admin is viewing.
-  return { ...serializarUsuario(usuario), empresaId };
+  return { ...serializarUsuario(usuario, empresa), empresaId };
 }
 
 async function switchEmpresa({ usuarioId, empresaId }) {
@@ -53,4 +61,8 @@ async function switchEmpresa({ usuarioId, empresaId }) {
   return { token };
 }
 
-export { login, demoLogin, me, switchEmpresa };
+function listarEmpresas() {
+  return prisma.empresa.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } });
+}
+
+export { login, demoLogin, me, switchEmpresa, listarEmpresas };

@@ -51,4 +51,12 @@ async function switchEmpresa(req, res, next) {
   }
 }
 
-export { login, demoLogin, me, switchEmpresa };
+async function listarEmpresas(req, res, next) {
+  try {
+    res.json(await service.listarEmpresas());
+  } catch (err) {
+    next(err);
+  }
+}
+
+export { login, demoLogin, me, switchEmpresa, listarEmpresas };
