@@ -6,6 +6,7 @@ import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import ResumenPage from './pages/ResumenPage';
 import CotizacionesListPage from './features/cotizaciones/CotizacionesListPage';
+import CotizacionEditorPage from './features/cotizaciones/CotizacionEditorPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
               <Route element={<AppLayout />}>
                 <Route path="/" element={<ResumenPage />} />
                 <Route path="/cotizaciones" element={<CotizacionesListPage />} />
+                <Route path="/cotizaciones/nueva" element={<CotizacionEditorPage />} />
               </Route>
             </Route>
           </Routes>
