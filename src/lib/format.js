@@ -8,6 +8,9 @@ export function formatCurrency(valor) {
 }
 
 export function formatDate(fecha) {
-  const d = typeof fecha === 'string' ? new Date(fecha) : fecha;
-  return `${String(d.getUTCDate()).padStart(2, '0')} ${MESES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  if (typeof fecha === 'string') {
+    const d = new Date(fecha);
+    return `${String(d.getUTCDate()).padStart(2, '0')} ${MESES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+  return `${String(fecha.getDate()).padStart(2, '0')} ${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`;
 }
