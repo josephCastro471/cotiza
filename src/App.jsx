@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import ResumenPage from './pages/ResumenPage';
+import CotizacionesListPage from './features/cotizaciones/CotizacionesListPage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<ResumenPage />} />
+                <Route path="/cotizaciones" element={<CotizacionesListPage />} />
               </Route>
             </Route>
           </Routes>
