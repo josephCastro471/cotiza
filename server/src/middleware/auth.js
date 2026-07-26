@@ -16,7 +16,7 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: { message: 'La sesión expiró o no es válida. Inicia sesión de nuevo.', code: 'INVALID_TOKEN' } });
   }
 
-  req.usuario = { id: payload.sub, empresaId: payload.empresaId, rol: payload.rol };
+  req.usuario = { id: payload.sub, empresaId: payload.empresaId, rol: payload.rol, clienteId: payload.clienteId };
   runWithTenant({ empresaId: payload.empresaId, usuarioId: payload.sub }, () => next());
 }
 
