@@ -1,13 +1,21 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 const ToastContext = createContext(null);
 
 export function ToastProvider({ children }) {
   const [toast, setToast] = useState(null);
+  const timeoutRef = useRef(null);
 
   const mostrar = useCallback((mensaje, opciones = {}) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setToast({ mensaje, ...opciones });
-    setTimeout(() => setToast(null), 4000);
+    timeoutRef.current = setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, []);
 
   return (

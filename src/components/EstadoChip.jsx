@@ -7,7 +7,7 @@ const ESTADOS = {
 };
 
 export default function EstadoChip({ estado }) {
-  const info = ESTADOS[estado];
+  const info = ESTADOS[estado] ?? { color: '#6E7A74', label: estado ?? '—' };
   return (
     <span className="inline-flex items-center text-small text-ink-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ background: info.color }} />
