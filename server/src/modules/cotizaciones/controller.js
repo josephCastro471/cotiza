@@ -26,6 +26,23 @@ const actualizarSchema = z.object({
   lineas: z.array(lineaSchema),
 });
 
+// Raw ?query params are strings that go straight into a Prisma `where` clause
+// today (via service.listar's filtros object). An invalid value — e.g.
+// ?estado=NO_EXISTE — used to reach Prisma untouched and surface as a raw
+// ORM validation error (500), echoing internal query structure to the client.
+// Validate at the HTTP boundary instead so bad filters become a normal 400.
+const isoDate = z.string().refine((valor) => !Number.isNaN(new Date(valor).getTime()), {
+  message: 'Fecha inválida, usa formato ISO (ej. 2026-01-31).',
+});
+
+const filtrosQuerySchema = z.object({
+  estado: z.enum(['BORRADOR', 'ENVIADO', 'APROBADO', 'RECHAZADO', 'VENCIDO']).optional(),
+  clienteId: z.string().min(1).optional(),
+  desde: isoDate.optional(),
+  hasta: isoDate.optional(),
+  q: z.string().optional(),
+});
+
 // Prisma represents Decimal-typed columns (subtotal, iva, total, cantidad,
 // precioUnitario, descuentoPct) as Decimal.js instances. Those serialize to
 // JSON as quoted strings (e.g. "148.9") rather than numbers, so we convert
@@ -44,10 +61,24 @@ function serializarLinea(linea) {
   };
 }
 
+// Nested Usuario rows (vendedor, an evento's actor) must never expose
+// passwordHash — or anything beyond what the UI needs — to any authenticated
+// caller, including external CLIENTE-role users reading their own cotización.
+function serializarUsuarioPublico(usuario) {
+  if (!usuario) return usuario;
+  return { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol };
+}
+
+function serializarEvento(evento) {
+  return { ...evento, actor: serializarUsuarioPublico(evento.actor) };
+}
+
 function serializarCotizacion(cotizacion) {
   if (!cotizacion) return cotizacion;
   return {
     ...cotizacion,
+    vendedor: serializarUsuarioPublico(cotizacion.vendedor),
+    eventos: Array.isArray(cotizacion.eventos) ? cotizacion.eventos.map(serializarEvento) : cotizacion.eventos,
     subtotal: aNumero(cotizacion.subtotal),
     descuentoTotal: aNumero(cotizacion.descuentoTotal),
     iva: aNumero(cotizacion.iva),
@@ -57,8 +88,12 @@ function serializarCotizacion(cotizacion) {
 }
 
 async function listar(req, res, next) {
+  const parsed = filtrosQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: 'Revisa los filtros de búsqueda.', code: 'VALIDATION_ERROR', detalles: parsed.error.flatten() } });
+  }
   try {
-    const cotizaciones = await service.listar({ usuario: req.usuario, filtros: req.query });
+    const cotizaciones = await service.listar({ usuario: req.usuario, filtros: parsed.data });
     res.json(cotizaciones.map(serializarCotizacion));
   } catch (err) {
     next(err);

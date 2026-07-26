@@ -33,9 +33,19 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    error: { message: err.message || 'Ocurrió un error inesperado.', code: err.code || 'INTERNAL_ERROR' },
+  console.error(err.message, err.stack);
+  // Only errors application code explicitly marked (by setting `.status`) are
+  // safe to echo back to the client — those messages are written for a Spanish
+  // end user. Anything else (a raw Prisma/ORM error, an unexpected exception)
+  // must not leak internal query/field structure, so it gets a fixed generic
+  // message while the real detail still goes to the server log above.
+  if (!err.status) {
+    return res.status(500).json({
+      error: { message: 'Ocurrió un error inesperado. Intenta de nuevo más tarde.', code: 'INTERNAL_ERROR' },
+    });
+  }
+  res.status(err.status).json({
+    error: { message: err.message, code: err.code || 'BAD_REQUEST' },
   });
 });
 
