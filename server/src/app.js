@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cotizacionesRoutes from './modules/cotizaciones/routes.js';
+import authRoutes from './modules/auth/routes.js';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/cotizaciones', cotizacionesRoutes);
+app.use('/api/auth', authRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: { message: 'Recurso no encontrado.', code: 'NOT_FOUND' } });
