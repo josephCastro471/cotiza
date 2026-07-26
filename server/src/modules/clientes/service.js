@@ -21,7 +21,20 @@ async function actualizar(id, datos) {
 async function eliminar(id) {
   const existente = await prisma.cliente.findUnique({ where: { id } });
   if (!existente) return false;
-  await prisma.cliente.delete({ where: { id } });
+  try {
+    await prisma.cliente.delete({ where: { id } });
+  } catch (err) {
+    // P2003 = Prisma foreign-key constraint violation. A cliente with
+    // cotizaciones still referencing it used to surface this as a raw,
+    // uncaught 500; turn it into a clear, actionable 409 instead.
+    if (err.code === 'P2003') {
+      const e = new Error('Este cliente tiene cotizaciones asociadas. Archívalo o reasigna sus cotizaciones antes de eliminarlo.');
+      e.status = 409;
+      e.code = 'FK_CONSTRAINT';
+      throw e;
+    }
+    throw err;
+  }
   return true;
 }
 

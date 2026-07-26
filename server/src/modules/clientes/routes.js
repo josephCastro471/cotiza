@@ -6,8 +6,10 @@ import * as controller from './controller.js';
 const router = Router();
 
 router.use(requireAuth);
-router.get('/', controller.listar);
-router.get('/:id', controller.obtener);
+// CLIENTE-role tokens must not be able to browse the tenant's full customer
+// list/detail (names, RUCs, emails, phones of every other customer).
+router.get('/', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.listar);
+router.get('/:id', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.obtener);
 router.post('/', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.crear);
 router.patch('/:id', requireRole('ADMIN', 'GERENTE', 'VENDEDOR'), controller.actualizar);
 router.delete('/:id', requireRole('ADMIN', 'GERENTE'), controller.eliminar);

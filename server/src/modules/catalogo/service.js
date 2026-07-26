@@ -21,7 +21,20 @@ async function actualizar(id, datos) {
 async function eliminar(id) {
   const existente = await prisma.catalogoItem.findUnique({ where: { id } });
   if (!existente) return false;
-  await prisma.catalogoItem.delete({ where: { id } });
+  try {
+    await prisma.catalogoItem.delete({ where: { id } });
+  } catch (err) {
+    // P2003 = Prisma foreign-key constraint violation. An ítem still
+    // referenced by cotización líneas used to surface this as a raw,
+    // uncaught 500; turn it into a clear, actionable 409 instead.
+    if (err.code === 'P2003') {
+      const e = new Error('Este ítem de catálogo tiene líneas de cotización asociadas. Elimínalo de esas cotizaciones antes de borrarlo.');
+      e.status = 409;
+      e.code = 'FK_CONSTRAINT';
+      throw e;
+    }
+    throw err;
+  }
   return true;
 }
 
