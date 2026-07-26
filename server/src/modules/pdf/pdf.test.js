@@ -34,6 +34,11 @@ describe('PDF export', () => {
   });
 
   afterAll(async () => {
+    await prisma.cotizacionLinea.deleteMany({ where: { cotizacion: { empresaId: empresa.id } } });
+    await prisma.cotizacion.deleteMany({ where: { empresaId: empresa.id } });
+    await prisma.usuario.deleteMany({ where: { empresaId: empresa.id } });
+    await prisma.cliente.deleteMany({ where: { empresaId: empresa.id } });
+    await prisma.empresa.deleteMany({ where: { id: empresa.id } });
     await prisma.$disconnect();
   });
 
