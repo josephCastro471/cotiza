@@ -7,6 +7,7 @@ import authRoutes from './modules/auth/routes.js';
 import clientesRoutes from './modules/clientes/routes.js';
 import catalogoRoutes from './modules/catalogo/routes.js';
 import dashboardRoutes from './modules/dashboard/routes.js';
+import demoRoutes from './modules/demo/routes.js';
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/catalogo', catalogoRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/demo', demoRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: { message: 'Recurso no encontrado.', code: 'NOT_FOUND' } });
