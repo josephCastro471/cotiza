@@ -2,12 +2,14 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
+import RoleRoute from './components/RoleRoute';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import ResumenPage from './pages/ResumenPage';
 import CotizacionesListPage from './features/cotizaciones/CotizacionesListPage';
 import CotizacionEditorPage from './features/cotizaciones/CotizacionEditorPage';
 import CotizacionDetallePage from './features/cotizaciones/CotizacionDetallePage';
+import AprobacionesPage from './features/aprobaciones/AprobacionesPage';
 
 export default function App() {
   return (
@@ -22,6 +24,9 @@ export default function App() {
                 <Route path="/cotizaciones" element={<CotizacionesListPage />} />
                 <Route path="/cotizaciones/nueva" element={<CotizacionEditorPage />} />
                 <Route path="/cotizaciones/:id" element={<CotizacionDetallePage />} />
+                <Route element={<RoleRoute roles={['ADMIN', 'GERENTE']} />}>
+                  <Route path="/aprobaciones" element={<AprobacionesPage />} />
+                </Route>
               </Route>
             </Route>
           </Routes>
