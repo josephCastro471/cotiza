@@ -4,7 +4,12 @@ services:
     runtime: node
     rootDir: server
     buildCommand: npm install && npx prisma generate
-    startCommand: npx prisma migrate deploy && npm start
+    # A fresh Neon DB has zero rows after `migrate deploy`, and there is no way
+    # to mint a first token to call /api/demo/reset without at least one
+    # seeded Usuario. Reseeding on every boot is fine for a demo app at this
+    # stage — seed.js's limpiar() truncates and recreates deterministically,
+    # so it's safe to run every time Render restarts the service on deploy.
+    startCommand: npx prisma migrate deploy && node prisma/seed.js && npm start
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -16,3 +21,5 @@ services:
         sync: false
       - key: PORT
         value: 4000
+      - key: DEMO_MODE
+        value: 'true'

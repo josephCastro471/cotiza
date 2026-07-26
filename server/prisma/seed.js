@@ -175,9 +175,17 @@ async function seed() {
     [empresaB.empresa, empresaB.usuarios, empresaB.clientes],
   ];
   const mitad = distribucion.length / 2;
+  // Interleave the distribution across companies (index j*2 + empresaIdx)
+  // instead of block-slicing it (empresaIdx*mitad + j). Block-slicing meant
+  // empresaA's 12-row slice only ever covered BORRADOR/ENVIADO/APROBADO and
+  // empresaB's only ever covered APROBADO/RECHAZADO/VENCIDO — since the demo
+  // login always lands in empresaA (hardcoded COT-A prefix in auth/service.js),
+  // the demo user never saw a RECHAZADO/VENCIDO row. Interleaving gives each
+  // company a representative spread across all five states while the global
+  // 24-row totals (4/4/12/2/2) stay identical.
   for (const [empresaIdx, [empresa, usuarios, clientes]] of empresas.entries()) {
     for (let j = 0; j < mitad; j += 1) {
-      const estado = distribucion[empresaIdx * mitad + j];
+      const estado = distribucion[(j * 2 + empresaIdx) % distribucion.length];
       const cliente = clientes[j % clientes.length];
       const vendedor = usuarios.VENDEDOR;
       const diasAtras = Math.floor(Math.random() * 90) + (estado === 'VENCIDO' ? 30 : 0);
