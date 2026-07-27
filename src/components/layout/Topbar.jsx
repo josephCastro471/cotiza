@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, Search, LogOut } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,9 +9,15 @@ function iniciales(nombre) {
 }
 
 export default function Topbar() {
-  const { usuario, switchEmpresa } = useAuth();
+  const { usuario, switchEmpresa, logout } = useAuth();
   const [empresas, setEmpresas] = useState([]);
   const [abierto, setAbierto] = useState(false);
+  const navigate = useNavigate();
+
+  function cerrarSesion() {
+    logout();
+    navigate('/login');
+  }
 
   useEffect(() => {
     if (usuario?.rol === 'ADMIN') {
@@ -64,6 +71,13 @@ export default function Topbar() {
         <small className="text-ink-500 text-small">
           {usuario?.nombre} · {usuario?.rol && usuario.rol.charAt(0) + usuario.rol.slice(1).toLowerCase()}
         </small>
+        <button
+          onClick={cerrarSesion}
+          title="Cerrar sesión"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-control text-ink-500 text-small hover:text-danger hover:bg-danger/5 transition-colors duration-[120ms] ease-std"
+        >
+          <LogOut size={15} />
+        </button>
       </div>
     </header>
   );

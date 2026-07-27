@@ -6,6 +6,7 @@ import RoleRoute from './components/RoleRoute';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import ResumenPage from './pages/ResumenPage';
+import ComingSoonPage from './pages/ComingSoonPage';
 import CotizacionesListPage from './features/cotizaciones/CotizacionesListPage';
 import CotizacionEditorPage from './features/cotizaciones/CotizacionEditorPage';
 import CotizacionDetallePage from './features/cotizaciones/CotizacionDetallePage';
@@ -27,6 +28,9 @@ export default function App() {
                 <Route element={<RoleRoute roles={['ADMIN', 'GERENTE']} />}>
                   <Route path="/aprobaciones" element={<AprobacionesPage />} />
                 </Route>
+                <Route path="/clientes" element={<ComingSoonPage title="Clientes" />} />
+                <Route path="/catalogo" element={<ComingSoonPage title="Catálogo" />} />
+                <Route path="/ajustes" element={<ComingSoonPage title="Ajustes" />} />
               </Route>
             </Route>
           </Routes>

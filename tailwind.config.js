@@ -29,6 +29,7 @@ export default {
         h1: ['22px', { lineHeight: '28px' }],
         display: ['28px', { lineHeight: '34px' }],
       },
+      spacing: { '4.5': '1.125rem' },
       borderRadius: { control: '6px', card: '8px', chip: '4px' },
       transitionTimingFunction: { std: 'cubic-bezier(.2,.8,.3,1)' },
     },
